@@ -24,5 +24,5 @@ cd buffer_box
 ```
 4. build
 ```bash
-RUSTFLAGS="-C target_cpu=native" cargo build --release
+RUSTFLAGS="-C target_cpu=native -Zlocation-detail=none -Zfmt-debug=none" cargo build --release
 ```
