@@ -10,3 +10,10 @@ clipboard-files = "0.1.2"
 image = "0.25.10"
 inquire = "0.9.4"
 rand = "0.10.1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
