@@ -5,12 +5,12 @@ use std::fs;
 use std::env;
 use std::io;
 use arboard::{Clipboard,ImageData};
-use rand::{distr::Alphanumeric, Rng, RngExt};
+use rand::{distr::Alphanumeric, RngExt};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Utility for unpacking data from clipboard")]
 struct Args {
-    #[arg(short, long, value_name = "FILEPATH")]
+    ///(Optional) - Is path to file (Ex. ~/Downloads/test.txt)
     path: Option<PathBuf>
 }
 
@@ -76,8 +76,11 @@ fn check_direct_data(dst_path: &Path, clipboard: &mut Clipboard) -> Result<(),()
 
             let raw_bytes = image.bytes.to_owned();
 
-            let final_path = dst_path.with_extension("png");
-            println!("{}",final_path.display());
+            let final_path = match dst_path.extension().is_none() {
+                true => { dst_path.with_added_extension("png") }
+                false => { dst_path.to_path_buf() }
+            };
+            //println!("{}",final_path.display());
 
             match image::save_buffer(
                 final_path,
