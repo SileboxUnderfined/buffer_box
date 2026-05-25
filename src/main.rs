@@ -1,8 +1,10 @@
 use clap::{ArgAction, Parser};
 use std::path::{Path,PathBuf};
+use std::fs::{File};
 use std::fs;
-use std::env;
 use std::io;
+use std::env;
+use std::io::{BufWriter};
 use arboard::{Clipboard};
 use rand::{distr::Alphanumeric, RngExt};
 
@@ -43,6 +45,20 @@ fn try_to_copy_file(source_path: &Path, dst_path: &Path) -> io::Result<()> {
 
 fn try_to_write_string_to_file(text: &String, dst_path: &Path) -> io::Result<()> {
     fs::write(dst_path, text)?;
+    Ok(())
+}
+
+fn save_image_to_path(path: &PathBuf, pixels: &Vec<u8>, width: u32, height: u32) -> Result<(), Box<dyn std::error::Error>> {
+    let file = File::create(path)?;
+    let ref mut w = BufWriter::new(file);
+
+    let mut encoder = png::Encoder::new(w, width, height);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+
+    let mut writer = encoder.write_header()?;
+    writer.write_image_data(pixels.as_slice())?; 
+
     Ok(())
 }
 
@@ -92,12 +108,11 @@ fn check_direct_data(dst_path: &Path, clipboard: &mut Clipboard) -> Result<PathB
             //let final_path_copy = final_path.clone(); // TODO: FIX
             //println!("{}",final_path.display());
 
-            match image::save_buffer(
-                &final_path,
-                &raw_bytes,
-                width,
-                height,
-                image::ColorType::Rgba8
+            match save_image_to_path(
+                &final_path, 
+                &raw_bytes, 
+                width, 
+                height
             ) {
                 Ok(()) => {
                     println!("success: written image binary to path {}", &final_path.display());
