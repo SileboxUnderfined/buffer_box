@@ -1,17 +1,19 @@
-use inquire::{Text};
-use clap::{Parser};
+use clap::{ArgAction, Parser};
 use std::path::{Path,PathBuf};
 use std::fs;
 use std::env;
 use std::io;
-use arboard::{Clipboard,ImageData};
+use arboard::{Clipboard};
 use rand::{distr::Alphanumeric, RngExt};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Utility for unpacking data from clipboard")]
 struct Args {
-    ///(Optional) - Is path to file (Ex. ~/Downloads/test.txt)
-    path: Option<PathBuf>
+    ///(Optional) - Path to file (Ex. ~/Downloads/test.txt)
+    path: Option<PathBuf>,
+    ///(Optional) - Copy final path to clipboard
+    #[arg(short, long, action = ArgAction::SetTrue)]
+    copy_path: bool,
 }
 
 struct MyImageData {
@@ -44,14 +46,19 @@ fn try_to_write_string_to_file(text: &String, dst_path: &Path) -> io::Result<()>
     Ok(())
 }
 
-fn check_direct_data(dst_path: &Path, clipboard: &mut Clipboard) -> Result<(),()> {
+fn check_direct_data(dst_path: &Path, clipboard: &mut Clipboard) -> Result<PathBuf,()> {
     match try_to_get_direct_data(clipboard) {
         ClipboardContent::Text(text) => {
             let src_path = Path::new(&text);
+            let final_path = match dst_path.extension().is_none() {
+                true => { dst_path.with_added_extension("txt") }
+                false => { dst_path.to_path_buf() }
+            };
             if src_path.exists() {
-                match try_to_copy_file(src_path, dst_path) {
+                match try_to_copy_file(src_path, &final_path) {
                     Ok(()) => {
-                        println!("success: copied file to path {}", dst_path.display());
+                        println!("success: copied file to path {}", &final_path.display());
+                        return Ok(dst_path.to_path_buf())
                     }
                     Err(err) => {
                         eprintln!("error: error while copying file {}", err);
@@ -59,9 +66,10 @@ fn check_direct_data(dst_path: &Path, clipboard: &mut Clipboard) -> Result<(),()
                     }
                 }
             } else {
-                match try_to_write_string_to_file(&text, dst_path) {
+                match try_to_write_string_to_file(&text, &final_path) {
                     Ok(()) => {
-                        println!("success: written text to path {}", dst_path.display());
+                        println!("success: written text to path {}", &final_path.display());
+                        return Ok(final_path.to_path_buf())
                     }
                     Err(err) => {
                         eprintln!("error: error while writing text to file {}", err);
@@ -80,17 +88,20 @@ fn check_direct_data(dst_path: &Path, clipboard: &mut Clipboard) -> Result<(),()
                 true => { dst_path.with_added_extension("png") }
                 false => { dst_path.to_path_buf() }
             };
+
+            //let final_path_copy = final_path.clone(); // TODO: FIX
             //println!("{}",final_path.display());
 
             match image::save_buffer(
-                final_path,
+                &final_path,
                 &raw_bytes,
                 width,
                 height,
                 image::ColorType::Rgba8
             ) {
                 Ok(()) => {
-                    println!("success: written image binary to path {}", dst_path.display());
+                    println!("success: written image binary to path {}", &final_path.display());
+                    return Ok(final_path)
                 }
                 Err(e) => {
                     eprintln!("error: error while writing image to file {}", e);
@@ -102,8 +113,7 @@ fn check_direct_data(dst_path: &Path, clipboard: &mut Clipboard) -> Result<(),()
             eprintln!("error: unkown or empty buffer");
             return Err(())
         }
-    }
-    Ok(())
+    };
 }
 
 fn generate_random_filename(length: usize) -> PathBuf {
@@ -134,5 +144,11 @@ fn main() {
 
     let mut clipboard = Clipboard::new().expect("error: coul not initialize clipboard!");
 
-    check_direct_data(&dst_path, &mut clipboard);
+    let final_path: PathBuf = check_direct_data(&dst_path, &mut clipboard).unwrap();
+
+    if args.copy_path {
+        clipboard.set_text(final_path.to_string_lossy()).unwrap();
+    }
+
+    std::process::exit(0);
 }
