@@ -1,0 +1,53 @@
+stages:
+  - test
+  - build
+
+.test_template:
+  stage: test
+  image: rust:1.93.0-slim
+  variables:
+    CARGO_HOME: $CI_PROJECT_DIR/.cargo
+  cache:
+    key: "test-cache"
+    paths:
+      - .cargo/
+      - target/
+
+.build_template:
+  stage: build
+  image: rustlang/rust:nightly-2026-01-19-slim 
+  variables:
+    CARGO_HOME: $CI_PROJECT_DIR/.cargo
+    RUSTFLAGS: "-C target_cpu=native -Zlocation-detail=none -Zfmt-debug=none"
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .cargo/
+      - target/
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends docker.io git
+    - cargo install cross --git https://github.com/cross-rs/cross
+
+cargo_check:
+  extends: .test_template
+  script:
+    - cargo check --workspace --all--targets
+
+build_targets:
+  extends: .build_template
+  script:
+    - cross build --release --target $TARGET
+  parallel:
+    matrix:
+      - TARGET:
+          - x86_64-unknown-linux-gnu
+          - x86_64-pc-windows-gnu
+          - aarch64-unknown-linux-gnu
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+
+  artifacts:
+    name: "$CI_PROJECT_NAME-$TARGET-$CI_COMMIT_REF_SLUG"
+    paths:
+      - target/$TARGET/release/${CI_PROJECT_NAME}
+      - target/$TARGET/release/${CI_PROJECT_NAME}.exe
